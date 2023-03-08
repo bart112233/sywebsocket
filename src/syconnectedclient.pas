@@ -345,6 +345,10 @@ begin
                       SendCloseFrame(CLOSE_PROTOCOL_ERROR, '');
                       exit;
                     end;
+                    if Assigned(OnClientPong) then
+                    begin
+                      OnClientPong(self, wsFrame.MessageStr);
+                    end;
                   end;
                   optCloseConnect:
                   begin
