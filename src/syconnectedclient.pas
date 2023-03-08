@@ -348,26 +348,32 @@ begin
                   end;
                   optCloseConnect:
                   begin
-                    if wsFrame.PayloadLen > 123 then
+                    if FWebSocket then
                     begin
-                      SendCloseFrame(CLOSE_PROTOCOL_ERROR, '');
-                      Exit;
-                    end;
-                    if wsFrame.PayloadLen > 2 then
-                      if not IsValidUTF8(@wsFrame.Binary[2], wsFrame.PayloadLen - 2) then
+                      if wsFrame.PayloadLen > 123 then
                       begin
-                        SendCloseFrame(CLOSE_INVALID_FRAME_PAYLOAD_DATA, '');
-                        exit;
-                      end;
-                    case wsFrame.Reason of
-                      0..999, CLOSE_RESERVER, CLOSE_NO_STATUS_RCVD, CLOSE_ABNORMAL_CLOSURE,
-                      1012..1014, CLOSE_TLS_HANDSHAKE, 1016..2999:
                         SendCloseFrame(CLOSE_PROTOCOL_ERROR, '');
-                      else
-                      begin
-                        SendCloseFrame(wsFrame.Reason, wsFrame.MessageStr);
+                        Exit;
                       end;
+                      if wsFrame.PayloadLen > 2 then
+                        if not IsValidUTF8(@wsFrame.Binary[2], wsFrame.PayloadLen - 2) then
+                        begin
+                          SendCloseFrame(CLOSE_INVALID_FRAME_PAYLOAD_DATA, '');
+                          exit;
+                        end;
+                      case wsFrame.Reason of
+                        0..999, CLOSE_RESERVER, CLOSE_NO_STATUS_RCVD, CLOSE_ABNORMAL_CLOSURE,
+                        1012..1014, CLOSE_TLS_HANDSHAKE, 1016..2999:
+                          SendCloseFrame(CLOSE_PROTOCOL_ERROR, '');
+                        else
+                        begin
+                          SendCloseFrame(wsFrame.Reason, wsFrame.MessageStr);
+                        end;
 
+                      end;
+                    end else
+                    begin
+                      Terminate;
                     end;
                     Exit;
                   end;
@@ -475,14 +481,17 @@ begin
       WFrame.Reason := AReason;
       WFrame.MessageStr := AMessage;
       if FSock.CanWrite(1000) then
+      begin
+        FWebSocket := False;
         FSock.SendBuffer(WFrame.Frame.Memory, WFrame.Frame.Size);
+      end;
     finally
       FreeAndNil(WFrame);
     end;
   finally
     LeaveCriticalsection(FCritSection);
   end;
-  TerminateThread;
+  //TerminateThread;
 end;
 
 procedure TsyConnectedClient.SendMessageFrame(AMessage: string);

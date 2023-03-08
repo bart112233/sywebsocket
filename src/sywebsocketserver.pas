@@ -285,12 +285,21 @@ destructor TsyWebSocketServer.Destroy;
 var
   list: specialize TList<TsyConnectedClient>;
   Cl: TsyConnectedClient;
+  wait: integer;
 begin
   list := FLockedClientList.LockList;
   try
     for cl in List do
     begin
-      cl.TerminateThread;
+      cl.SendCloseFrame(1000,'');
+      wait := 100;
+      while ((not cl.Finished) and (wait > 0)) do
+      begin
+        sleep(50);
+        dec(wait);
+      end;
+      if not cl.Finished then
+        cl.TerminateThread;
     end;
   finally
     FLockedClientList.UnlockList;
