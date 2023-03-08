@@ -72,6 +72,7 @@ type
     procedure OnClientBinaryData(Sender: TObject; BinData: TBytes);
     procedure OnClientClose(Sender: TObject; Reason: integer; Message: string);
     procedure OnClientPing(Sender: TObject; Message: string);
+    procedure OnClientPong(Sender: TObject; Message: string);
     procedure OnClientTextMessage(Sender: TObject; Message: string);
     procedure OnClientTerminate(Sender: TObject);
 
@@ -80,6 +81,7 @@ type
     procedure CloseConnectionNotify;
     procedure BinDataNotify;
     procedure PingMessageNotify;
+    procedure PongMessageNotify;
   public
     constructor Create(APort: integer);
     destructor Destroy; override;
@@ -165,6 +167,14 @@ begin
     OnMessage(self);
 end;
 
+procedure TsyWebSocketServer.PongMessageNotify;
+begin
+  if Terminated then
+    exit;
+  if Assigned(OnMessage) then
+    OnMessage(self);
+end;
+
 procedure TsyWebSocketServer.OnClientTextMessage(Sender: TObject; Message: string);
 var
   MsgRec: TMessageRecord;
@@ -216,6 +226,24 @@ begin
   // send event to MainProgram about new Text Message
   // The client must read the data from the queue FMessageQueue;
   Queue(@PingMessageNotify);
+end;
+
+procedure TsyWebSocketServer.OnClientPong(Sender: TObject; Message: string);
+var
+  MsgRec: TMessageRecord;
+begin
+  // add message to Queue
+  if not (Sender is TsyConnectedClient) then
+    exit;
+  MsgRec.Message := Message;
+  MsgRec.Sender := TsyConnectedClient(Sender);
+  MsgRec.Opcode := optPong;
+  MsgRec.Reason := 0;
+  FMessageQueue.PushItem(MsgRec);
+
+  // send event to MainProgram about new Text Message
+  // The client must read the data from the queue FMessageQueue;
+  Queue(@PongMessageNotify);
 end;
 
 procedure TsyWebSocketServer.OnClientBinaryData(Sender: TObject; BinData: TBytes);
@@ -318,6 +346,7 @@ begin
           Client.OnClientClose := @OnClientClose;
           Client.OnClientBinaryData := @OnClientBinaryData;
           Client.OnClientPing := @OnClientPing;
+          Client.OnClientPong := @OnClientPong;
           Client.OnClientConnected := @DoClientConnected;
           Client.Tag := FClientCount;
           Inc(FClientCount);

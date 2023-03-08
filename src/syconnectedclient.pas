@@ -63,6 +63,7 @@ type
   private
     FCritSection: TRTLCriticalSection;
     FOnClientPing: TOnClientTextMessage;
+    FOnClientPong: TOnClientTextMessage;
     FTerminateEvent: PRTLEvent;
     FSock: TTCPBlockSocket;
     FWebSocket: boolean;
@@ -91,11 +92,13 @@ type
     procedure SendMessageFrame(AMessage: string);
     procedure SendBinaryFrame(ABinData: TBytes);
     procedure SendPong(AMessage: string);
+    procedure SendPing(AMessage: String);
 
     property OnClientTextMessage: TOnClientTextMessage read FOnClientTextMessage write FOnClientTextMessage;
     property OnClientBinaryData: TOnClientBinaryMessage read FOnClientBinaryData write FOnClientBinaryData;
     property OnClientClose: TOnClientCloseConnect read FOnClientClose write FOnClientClose;
     property OnClientPing: TOnClientTextMessage read FOnClientPing write FOnClientPing;
+    property OnClientPong: TOnClientTextMessage read FOnClientPong write FOnClientPong;
     property OnClientConnected: TNotifyEvent read FOnClientConnected write FOnClientConnected;
     property Tag: integer read FTag write FTag;
   end;
@@ -323,6 +326,16 @@ begin
                   end;
                   optPong: // we can not send ping. And if we get Pong we disconnect
                   begin
+                    if wsFrame.PayloadLen > 125 then // payload <=125
+                    begin
+                      SendCloseFrame(CLOSE_PROTOCOL_ERROR, '');
+                      exit;
+                    end;
+                    if not wsFrame.Fin then   // no fragmentation
+                    begin
+                      SendCloseFrame(CLOSE_PROTOCOL_ERROR, '');
+                      exit;
+                    end;
                     if not wsFrame.Fin then   // no fragmentation
                     begin
                       SendCloseFrame(CLOSE_PROTOCOL_ERROR, '');
@@ -520,6 +533,29 @@ begin
     WFrame := TsyBaseWebsocketFrame.Create;
     try
       WFrame.Opcode := optPong;
+      WFrame.Mask := False;
+      WFrame.MessageStr := AMessage;
+      if FSock.CanWrite(1000) then
+        FSock.SendBuffer(WFrame.Frame.Memory, WFrame.Frame.Size);
+    finally
+      FreeAndNil(WFrame);
+    end;
+  finally
+    LeaveCriticalsection(FCritSection);
+  end;
+end;
+
+procedure TsyConnectedClient.SendPing(AMessage: String);
+var
+  WFrame: TsyBaseWebsocketFrame;
+begin
+  EnterCriticalsection(FCritSection);
+  try
+    if Terminated then
+      exit;
+    WFrame := TsyBaseWebsocketFrame.Create;
+    try
+      WFrame.Opcode := optPing;
       WFrame.Mask := False;
       WFrame.MessageStr := AMessage;
       if FSock.CanWrite(1000) then
