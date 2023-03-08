@@ -82,6 +82,8 @@ type
     procedure SendHandShake(ASecWebSocketKey: string);
     function GetWebSocketKey(AHeader: TStringList): string;
     procedure ProcessData;
+    function GetClientIP: string;
+    function GetClientPort: word;
   public
     constructor Create(hSock: TSocket);
     destructor Destroy; override;
@@ -101,6 +103,8 @@ type
     property OnClientPong: TOnClientTextMessage read FOnClientPong write FOnClientPong;
     property OnClientConnected: TNotifyEvent read FOnClientConnected write FOnClientConnected;
     property Tag: integer read FTag write FTag;
+    property IP: string read GetClientIP;
+    property Port: word read GetClientPort;
   end;
 
 implementation
@@ -414,6 +418,16 @@ begin
     FreeAndNil(FWebsocketFrame);
   end;
 
+end;
+
+function TsyConnectedClient.GetClientIP: string;
+begin
+  Result := FSock.GetRemoteSinIP;
+end;
+
+function TsyConnectedClient.GetClientPort: word;
+begin
+  Result := FSock.GetRemoteSinPort;
 end;
 
 constructor TsyConnectedClient.Create(hSock: TSocket);
